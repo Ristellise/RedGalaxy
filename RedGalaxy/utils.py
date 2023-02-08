@@ -247,7 +247,7 @@ class UtilBox:
             )
             if set_media.type == "video":
                 set_media.data_info = extended_media["video_info"]
-                set_media.features = extended_media["features"],
+                set_media.features = extended_media.get("features",None),
             elif set_media.type != "photo":
                 raise Exception(f"Unknown type: {set_media.type}@{tweet_id}")
             wrapped_media_extended.append(set_media)
