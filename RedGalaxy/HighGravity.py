@@ -29,25 +29,29 @@ class HighGravity:
         self.session.do_headers("https://twitter.com", set_auth=False)
         r = await self.session.get("https://twitter.com")
         if r.status != 200:
-            print(r.status)
+            self.logging.error(f"Failed to get routes. Expected 200. Got: {r.status}")
             return {}
+        self.logging.debug("Content found.")
 
         soup = BeautifulSoup(await r.text(), "lxml")
         r = re.compile("\"(.*?)\":\"(.*?)\"")
         ra = re.compile(",(.*?):\"(.*?)\"")
         r2 = re.compile("\"https://abs.twimg.com/(.*?)/\"")
-        # print(soup)
         rba_f = None
         routes = {}
+        c = 0
         for script in soup.select("script"):
-            if "endpoints" in script.text.lower():
+            if "endpoints.".lower() in script.text.lower():
+                self.logging.debug("endpoints. found.")
                 rba = r2.findall(script.text)
                 if len(rba) == 1:
                     rba_f = rba[0]
+                    self.logging.debug(f"rba_f Found: {rba_f}")
                 rb = r.findall(script.text)
                 rab = ra.findall(script.text)
                 for i in rab:
                     if i[0] == "api" and len(i[1]) == 7:
+                        self.logging.debug(f"Regex Matched: {i[0]} {i[1]}")
                         ra = await self.process_js("https://abs.twimg.com/", rba_f, i[0], i[1])
                         if ra is None:
                             continue
@@ -59,6 +63,7 @@ class HighGravity:
                         # print(match)
                         if rba_f is None:
                             continue
+                        self.logging.debug(f"Regex Matched: {match[0]} {match[1]}")
                         ra = await self.process_js("https://abs.twimg.com/", rba_f, match[0], match[1])
                         if ra is None:
                             continue
@@ -77,7 +82,7 @@ class HighGravity:
         process = False
         js_url = f"{root}{mode}/{route}.{hash}{self.magic}.js"
         self.logging.debug(f"Processing JS: {js_url}")
-        #print(js_url)
+        # print(js_url)
         for filt in self.filtered:
             if route.endswith(filt):
                 process = True
@@ -94,7 +99,7 @@ class HighGravity:
             for route in routes:
                 # print(route[1:-1])
                 c = js2py.eval_js(f"route = {route[1:-1]}")
-                #print(type(c), c)
+                # print(type(c), c)
                 if isinstance(c, js2py.base.JsObjectWrapper):
                     url = f"https://api.twitter.com/graphql/{c['queryId']}/{c['operationName']}"
                     features = c['metadata']

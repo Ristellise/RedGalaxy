@@ -54,7 +54,7 @@ class VideoVariant:
 
 @dataclasses.dataclass
 class VideoMeta:
-    aspect: list[int, int]
+    aspect: typing.List[int]
     duration: float
     variants: typing.List[VideoVariant]
 
@@ -91,8 +91,11 @@ class ExtendedMedia(Media):
 class Tweet:
     id: int
     date: datetime.datetime
+
+    # Content is a bit special. For retweets it grabs the retweeted tweet
+    # as well as strips the trailing t.co for tweets with media.
     content: str
-    links: list[str]
+    links: typing.List[str]
     user: 'User'
     replies: int
     retweets: int
@@ -101,11 +104,11 @@ class Tweet:
     conversion_id: int
     language: str
     source: str  # May not exist anymore
-    media: typing.Optional[list['Media']] = None
-    extended_media: typing.Optional[list['ExtendedMedia']] = None
+    media: typing.Optional[typing.List['Media']] = None
+    extended_media: typing.Optional[typing.List['ExtendedMedia']] = None
     retweeted_tweet: typing.Optional['Tweet'] = None
     quoted_tweet: typing.Optional['Tweet'] = None
-    urls: typing.Optional[list] = None
+    urls: typing.Optional[typing.List] = None
 
     @property
     def url(self):

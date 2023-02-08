@@ -66,6 +66,10 @@ class TwitterUser:
             true_user = data["data"]["user"]["result"]['legacy']
             true_user["id"] = data["data"]["user"]["result"]["rest_id"]
             return UtilBox.make_user(true_user)
+        else:
+            print("Routes list:")
+            print(routes)
+            raise Exception("Missing routes?")
 
     getTweetFeatures = {"responsive_web_twitter_blue_verified_badge_is_enabled": True,
                         "responsive_web_graphql_exclude_directive_enabled": False,
