@@ -147,7 +147,7 @@ class UtilBox:
 
 
     @staticmethod
-    def make_tweet(true_tweet: dict, entry_globals: typing.Optional[dict] = None) -> Tweet:
+    def make_tweet(true_tweet: dict, entry_globals: typing.Optional[dict] = None, recurse=True) -> Tweet:
 
         tweet_id = true_tweet.get("id", -1)
         if tweet_id == -1:
@@ -157,7 +157,7 @@ class UtilBox:
         is_quoted = True if true_tweet.get("quoted_status_id") else False
         retweeted_tweet = None
         quoted_tweet = None
-        if is_retweeted:
+        if is_retweeted and recurse:
             if entry_globals is not None:
                 retweet_tweet_dict = entry_globals["tweets"][str(true_tweet.get("retweeted_status_id"))]
                 retweet_tweet_dict["user"] = entry_globals["users"][str(retweet_tweet_dict['user_id'])]
@@ -168,15 +168,15 @@ class UtilBox:
                     .get("user_results", {}).get("result").get("legacy")
             retweeted_tweet = UtilBox.make_tweet(
                 retweet_tweet_dict,
-                entry_globals)
+                entry_globals, recurse=False)
 
-        if is_quoted:
+        if is_quoted and recurse:
             if entry_globals is not None:
                 quoted_tweet_dict = entry_globals["tweets"][str(true_tweet.get("quoted_status_id"))]
                 quoted_tweet_dict["user"] = entry_globals["users"][str(quoted_tweet_dict['user_id'])]
                 quoted_tweet = UtilBox.make_tweet(
                     quoted_tweet_dict,
-                    entry_globals)
+                    entry_globals, recurse=False)
             else:
                 quoted_tweet_dict = true_tweet
                 if retweeted_tweet:
@@ -197,7 +197,7 @@ class UtilBox:
 
                 quoted_tweet = UtilBox.make_tweet(
                     quoted_tweet_dict,
-                    entry_globals)
+                    entry_globals, recurse=False)
 
         content = retweeted_tweet.content if is_retweeted else true_tweet.get("full_text")
 

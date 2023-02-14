@@ -144,9 +144,17 @@ class TwitterSearch:
     async def get_timeline(self, param: dict):
 
         adapted = await self.session.get("https://api.twitter.com/2/search/adaptive.json", params=param)
-        if adapted.headers['x-rate-limit-remaining'] == 0:
+        if adapted.headers.get('x-rate-limit-remaining', 0) == 0:
             await self.session.guest_token()
             self.session.do_headers("https://twitter.com/", guest_token=True)
+        if adapted.status == 503:
+            await asyncio.sleep(5)
+            tries = 5
+            while tries > 0:
+                adapted = await self.session.get("https://api.twitter.com/2/search/adaptive.json", params=param)
+                if adapted.status == 200:
+                    break
+                tries -= 1
         if adapted.status != 200:
             print(await adapted.text())
             raise Exception(f"Adaptive json returned {adapted.status}. Expected 200.")
