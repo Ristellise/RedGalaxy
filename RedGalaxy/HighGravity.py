@@ -26,9 +26,9 @@ class HighGravity:
         Requests and retireves the routes.
         :return: A dictionary mapped by the route names.
         """
-        self.session.do_headers("https://twitter.com", set_auth=False)
-        r = await self.session.get("https://twitter.com")
+        r = await self.session.get("https://twitter.com", set_auth=False)
         if r.status != 200:
+            self.logging.error(await r.text())
             self.logging.error(f"Failed to get routes. Expected 200. Got: {r.status}")
             return {}
         self.logging.debug("Content found.")

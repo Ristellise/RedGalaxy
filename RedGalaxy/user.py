@@ -1,9 +1,7 @@
 import json
 import logging
-import typing
-import urllib.parse
 
-from . import global_instance, SessionManager, HighGravity, User, UtilBox, UploadMedia
+from . import global_instance, SessionManager, HighGravity, User, UtilBox
 
 
 class TwitterUser:
@@ -58,7 +56,6 @@ class TwitterUser:
             for feature in route[1]['featureSwitches']:
                 if feature not in set_features:
                     self.logging.warning(f"!! {feature} found in featureSwitch but missing in setFeatures.")
-            self.session.do_headers("https://twitter.com/")
             a = await self.session.get(url, params={'variables': json.dumps(variables).replace(" ", ""),
                                                     'features': json.dumps(self.getUserFeatures).replace(" ", "")})
             # print(a)
@@ -118,14 +115,13 @@ class TwitterUser:
             set_features = list(features.keys())
             for feature in route[1]['featureSwitches']:
                 if feature not in set_features:
-                    self.logging.warning(f"!! {feature} found in featureSwitch but missing in setFeatures.")
-            # await self.session.guest_token()
+                    self.logging.warning(f"{feature} found in featureSwitch but missing in setFeatures.")
             await self.session.guest_token()
-            self.session.do_headers("https://twitter.com/i/web/graphql", guest_token=True)
             replaced = url.replace("https://api.twitter.com/", "https://twitter.com/i/api/")
             a = await self.session.get(replaced,
                                        params={'variables': json.dumps(variables).replace(" ", ""),
-                                               'features': json.dumps(features).replace(" ", "")})
+                                               'features': json.dumps(features).replace(" ", "")},
+                                       guest_token=True)
             data: dict = await a.json()
             inner_data: dict = data.get("data", {})
             for instruction in inner_data['threaded_conversation_with_injections_v2'].get("instructions"):
@@ -135,12 +131,3 @@ class TwitterUser:
                         if entry["entryId"].startswith("tweet-"):
                             base_tweet = entry["content"]["itemContent"]["tweet_results"]["result"]
                             return UtilBox.make_tweet_TimelineTweet(base_tweet)
-
-    # Stuff for posting a tweet
-    # Technically it should work but I believe it needs login to work first.
-
-    async def _upload_media(self, media: UploadMedia):
-        pass
-
-    async def send_tweet(self, user: typing.Union[User], content: str, media: UploadMedia = None):
-        pass
