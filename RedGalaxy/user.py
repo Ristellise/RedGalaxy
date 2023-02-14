@@ -130,4 +130,4 @@ class TwitterUser:
                     for entry in instruction["entries"]:
                         if entry["entryId"].startswith("tweet-"):
                             base_tweet = entry["content"]["itemContent"]["tweet_results"]["result"]
-                            return UtilBox.make_tweet_TimelineTweet(base_tweet)
+                            return UtilBox.common_tweet(base_tweet, None)

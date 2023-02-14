@@ -273,25 +273,19 @@ class TwitterSearch:
 
     def unpack_tweet(self, entryData: dict, entry_globals: dict, entry_id: str):
         if entryData.get("__typename") == "TimelineTimelineItem":
-            tweet = entryData.get("itemContent", {}).get("tweet_results", {}).get("result", {}).get("legacy", {})
+            tweet = entryData.get("itemContent", {}).get("tweet_results", {}).get("result", {})
             if not tweet:
                 raise Exception("Tweet data missing? [Timeline V2]")
-            tweet["user"] = entryData.get("itemContent", {}).get("tweet_results", {}) \
-                .get("result", {}).get("core", {}).get("user_results", {}).get("result", {}).get("legacy", {})
-            if not tweet["user"]:
-                raise Exception("Tweet user missing? [Timeline V2]")
+            tweet = UtilBox.common_tweet(tweet, None)
         elif entry_id.startswith("sq-I-t-"):
             tweet_mini = entryData.get("content", {}).get("item", {})
             if not tweet_mini:
                 raise Exception("Tweet Pointer data missing? [Search Timeline]")
 
             tweet = entry_globals["tweets"][str(tweet_mini["content"]["tweet"]["id"])]
-            tweet["user"] = entry_globals["users"][str(tweet['user_id'])]
-            if not tweet["user"]:
-                raise Exception("Tweet Pointer data missing? [Search Timeline]")
+            tweet = UtilBox.common_tweet(tweet, entry_globals)
         else:
             raise Exception("Unseen Tweet type? [Unknown Timeline]")
 
-        tweet = UtilBox.make_tweet(tweet, entry_globals)
 
         return {"tweet": tweet, "user": tweet.user}
