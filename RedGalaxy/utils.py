@@ -68,9 +68,9 @@ class UtilBox:
             quoted_tweet = base_tweet.get("quoted_status_result", {}).get("result", None)
             retweeted_tweet = base_tweet.get("retweeted_status_result", {}).get("result", None)
         if recurse and quoted_tweet:
-            quoted_tweet = UtilBox.common_tweet(quoted_tweet, None, recurse=False)
+            quoted_tweet = UtilBox.common_tweet(quoted_tweet, entry_globals, recurse=False)
         if recurse and retweeted_tweet:
-            retweeted_tweet = UtilBox.common_tweet(retweeted_tweet, None, recurse=False)
+            retweeted_tweet = UtilBox.common_tweet(retweeted_tweet, entry_globals, recurse=False)
         user = UtilBox.make_user(user_result['legacy'])
 
         content = retweeted_tweet.content if retweeted_tweet else base_tweet.get("full_text")
