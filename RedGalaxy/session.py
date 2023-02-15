@@ -117,7 +117,12 @@ class SessionManager:
                                           "consumer key+secret.")
 
     def __del__(self):
-        asyncio.get_event_loop().run_until_complete(self.session.close())
+        try:
+            loop = asyncio.get_event_loop()
+            loop.create_task(self.session.close())
+        except Exception:
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(self.session.close())
 
 
 global_instance = SessionManager(SessionMode.BEARER, _DEFAULT_BEARER)
