@@ -6,16 +6,15 @@ from . import User, Tweet, Media, UserCounts, ExtendedMedia
 
 
 class UtilBox:
-
     @staticmethod
     def make_user(user_data: dict) -> User:
         username = user_data.get("screen_name")
         displayname = user_data.get("name")
         description = user_data.get("description")
 
-        for url in user_data.get("entities", {}).get("description", {}).get('urls', []):
+        for url in user_data.get("entities", {}).get("description", {}).get("urls", []):
             description = description.replace(url.get("url"), url.get("expanded_url"))
-        links = user_data.get("entities", {}).get("url", {}).get('urls', [])
+        links = user_data.get("entities", {}).get("url", {}).get("urls", [])
         link_url = None
         if links:
             link_url = links[0]["expanded_url"]
@@ -26,7 +25,7 @@ class UtilBox:
             statuses=user_data.get("statuses_count", 0),
             favourites=user_data.get("favourites_count", 0),
             listed=user_data.get("listed_count", 0),
-            media=user_data.get("media_count", 0)
+            media=user_data.get("media_count", 0),
         )
         profile_url = user_data.get("profile_image_url_https", None)
         if profile_url:
@@ -43,37 +42,57 @@ class UtilBox:
             verified=user_data.get("verified", False),
             profile_banner_url=user_data.get("profile_banner_url", None),
             profile_image_url=profile_url,
-            verified_type=None if not user_data["verified"] else user_data.get("verified_type", "Legacy"),
-            created=email.utils.parsedate_to_datetime(user_data['created_at']),
+            verified_type=None
+            if not user_data["verified"]
+            else user_data.get("verified_type", "Legacy"),
+            created=email.utils.parsedate_to_datetime(user_data["created_at"]),
             location=user_data.get("location", None),
-            protected=False  # probably lol
+            protected=False,  # probably lol
         )
 
     @staticmethod
-    def common_tweet(true_tweet: dict, entry_globals: typing.Optional[dict], recurse: bool = True):
+    def common_tweet(
+        true_tweet: dict, entry_globals: typing.Optional[dict], recurse: bool = True
+    ):
         if entry_globals:
             user_result = {}
-            user_result['legacy'] = entry_globals["users"][str(true_tweet['user_id'])]
-            user_result['legacy']["id"] = str(true_tweet['user_id'])
+            user_result["legacy"] = entry_globals["users"][str(true_tweet["user_id"])]
+            user_result["legacy"]["id"] = str(true_tweet["user_id"])
             base_tweet = true_tweet
         else:
             user_result = true_tweet["core"]["user_results"]["result"]
-            user_result['legacy']["id"] = true_tweet["core"]["user_results"]["result"]["rest_id"]
+            user_result["legacy"]["id"] = true_tweet["core"]["user_results"]["result"][
+                "rest_id"
+            ]
             print("rest_id:", true_tweet["core"]["user_results"]["result"]["rest_id"])
             base_tweet = true_tweet["legacy"]
         if entry_globals:
-            quoted_tweet = entry_globals["tweets"].get(str(base_tweet.get("quoted_status_id", "-1")), None)
-            retweeted_tweet = entry_globals["tweets"].get(str(base_tweet.get("retweeted_status_id", "-1")), None)
+            quoted_tweet = entry_globals["tweets"].get(
+                str(base_tweet.get("quoted_status_id", "-1")), None
+            )
+            retweeted_tweet = entry_globals["tweets"].get(
+                str(base_tweet.get("retweeted_status_id", "-1")), None
+            )
         else:
-            quoted_tweet = base_tweet.get("quoted_status_result", {}).get("result", None)
-            retweeted_tweet = base_tweet.get("retweeted_status_result", {}).get("result", None)
+            quoted_tweet = base_tweet.get("quoted_status_result", {}).get(
+                "result", None
+            )
+            retweeted_tweet = base_tweet.get("retweeted_status_result", {}).get(
+                "result", None
+            )
         if recurse and quoted_tweet:
-            quoted_tweet = UtilBox.common_tweet(quoted_tweet, entry_globals, recurse=False)
+            quoted_tweet = UtilBox.common_tweet(
+                quoted_tweet, entry_globals, recurse=False
+            )
         if recurse and retweeted_tweet:
-            retweeted_tweet = UtilBox.common_tweet(retweeted_tweet, entry_globals, recurse=False)
-        user = UtilBox.make_user(user_result['legacy'])
+            retweeted_tweet = UtilBox.common_tweet(
+                retweeted_tweet, entry_globals, recurse=False
+            )
+        user = UtilBox.make_user(user_result["legacy"])
 
-        content = retweeted_tweet.content if retweeted_tweet else base_tweet.get("full_text")
+        content = (
+            retweeted_tweet.content if retweeted_tweet else base_tweet.get("full_text")
+        )
 
         medias = base_tweet.get("extended_entities", {}).get("media", [])
         urls = base_tweet.get("entities", {}).get("urls", [])
@@ -93,7 +112,6 @@ class UtilBox:
 
         wrapped_media_regular = []
         wrapped_media_extended = []
-
 
         for media in base_tweet.get("entities", {}).get("media", []):
             set_media = Media(
@@ -127,7 +145,9 @@ class UtilBox:
                 set_media.data_info = extended_media["video_info"]
                 set_media.features = extended_media.get("features", None)
             elif set_media.type != "photo":
-                raise Exception(f"Unknown type: {set_media.type}@{int(base_tweet['id_str'])}")
+                raise Exception(
+                    f"Unknown type: {set_media.type}@{int(base_tweet['id_str'])}"
+                )
             wrapped_media_extended.append(set_media)
 
         content = " ".join(spl_content)
@@ -135,11 +155,11 @@ class UtilBox:
         source = base_tweet.get("source", "")
         if source:
             source = source.replace("\\/", "/")
-            source = re.sub('<[^<]+?>', '', source)
+            source = re.sub("<[^<]+?>", "", source)
 
         return Tweet(
             id=int(base_tweet["id_str"]),
-            date=email.utils.parsedate_to_datetime(base_tweet['created_at']),
+            date=email.utils.parsedate_to_datetime(base_tweet["created_at"]),
             content=content,
             links=urls,
             user=user,

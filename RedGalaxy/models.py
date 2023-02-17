@@ -7,6 +7,7 @@ import typing
 # Adapted from  SNScrape
 # (https://github.com/JustAnotherArchivist/snscrape/blob/master/snscrape/modules/twitter.py)
 
+
 @dataclasses.dataclass
 class Media:
     display_url: str
@@ -66,7 +67,7 @@ class ExtendedMedia(Media):
     data_info: typing.Optional[dict] = None
     # Video Only?
     additional_media_info: typing.Optional[dict] = None
-    #features: typing.Optional[dict] = None
+    # features: typing.Optional[dict] = None
 
     @property
     def video_meta(self) -> typing.Optional[VideoMeta]:
@@ -79,8 +80,9 @@ class ExtendedMedia(Media):
                         variant.get("bitrate", -1),
                         variant.get("content_type", "video/unknown"),
                         variant.get("url", "https://video.twimg.com/"),
-                    ) for variant in self.data_info.get("variants", [])
-                ]
+                    )
+                    for variant in self.data_info.get("variants", [])
+                ],
             )
             return meta
         else:
@@ -96,7 +98,7 @@ class Tweet:
     # as well as strips the trailing t.co for tweets with media.
     content: str
     links: typing.List[str]
-    user: 'User'
+    user: "User"
     replies: int
     retweets: int
     favorites: int
@@ -104,15 +106,15 @@ class Tweet:
     conversion_id: int
     language: str
     source: str  # May not exist anymore
-    media: typing.Optional[typing.List['Media']] = None
-    extended_media: typing.Optional[typing.List['ExtendedMedia']] = None
-    retweeted_tweet: typing.Optional['Tweet'] = None
-    quoted_tweet: typing.Optional['Tweet'] = None
+    media: typing.Optional[typing.List["Media"]] = None
+    extended_media: typing.Optional[typing.List["ExtendedMedia"]] = None
+    retweeted_tweet: typing.Optional["Tweet"] = None
+    quoted_tweet: typing.Optional["Tweet"] = None
     urls: typing.Optional[typing.List] = None
 
     @property
     def url(self):
-        return f'https://twitter.com/{self.user.username}/status/{self.id}'
+        return f"https://twitter.com/{self.user.username}/status/{self.id}"
 
 
 @dataclasses.dataclass
@@ -144,7 +146,7 @@ class User:
 
     @property
     def url(self):
-        return f'https://twitter.com/{self.username}'
+        return f"https://twitter.com/{self.username}"
 
     @classmethod
     def create_blank(cls, username, id):

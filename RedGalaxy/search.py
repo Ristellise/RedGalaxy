@@ -5,7 +5,6 @@ from . import global_instance, SessionManager, UtilBox
 
 
 class TwitterSearch:
-
     def __init__(self, session_instance: SessionManager = None):
         """
 
@@ -90,17 +89,18 @@ class TwitterSearch:
 
         count = 20
 
-        args = {**self.search_base,
-                "q": query,
-                "tweet_search_mode": mode,
-                "count": count,
-                "query_source": "spelling_suggestion_click",
-                "cursor": None,
-                "spelling_corrections": 1,
-                "include_ext_edit_control": 0,
-                "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
-                       "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe"
-                }
+        args = {
+            **self.search_base,
+            "q": query,
+            "tweet_search_mode": mode,
+            "count": count,
+            "query_source": "spelling_suggestion_click",
+            "cursor": None,
+            "spelling_corrections": 1,
+            "include_ext_edit_control": 0,
+            "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
+            "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
+        }
         await self.session.guest_token()
         self.session.do_headers("https://twitter.com/", guest_token=True)
 
@@ -118,8 +118,7 @@ class TwitterSearch:
             for i in timeline.get("instructions"):
                 if list(i.keys())[0] == "addEntries":
                     for entry in self.iter_entries(
-                            i["addEntries"]["entries"],
-                            global_objects
+                        i["addEntries"]["entries"], global_objects
                     ):
                         if entry.get("type") == "cursor":
                             cursor[entry["direction"]] = entry
@@ -132,8 +131,7 @@ class TwitterSearch:
                                 break
                 elif list(i.keys())[0] == "replaceEntry":
                     for entry in self.iter_entries(
-                            i["addEntries"]["entries"],
-                            global_objects
+                        i["addEntries"]["entries"], global_objects
                     ):
                         if entry.get("type") == "cursor":
                             cursor[entry["direction"]] = entry
@@ -142,16 +140,19 @@ class TwitterSearch:
             args["cursor"] = cursor["bottom"]["value"]
 
     async def get_timeline(self, param: dict):
-
-        adapted = await self.session.get("https://api.twitter.com/2/search/adaptive.json", params=param)
-        if adapted.headers.get('x-rate-limit-remaining', 0) == 0:
+        adapted = await self.session.get(
+            "https://api.twitter.com/2/search/adaptive.json", params=param
+        )
+        if adapted.headers.get("x-rate-limit-remaining", 0) == 0:
             await self.session.guest_token()
             self.session.do_headers("https://twitter.com/", guest_token=True)
         if adapted.status == 503:
             await asyncio.sleep(5)
             tries = 5
             while tries > 0:
-                adapted = await self.session.get("https://api.twitter.com/2/search/adaptive.json", params=param)
+                adapted = await self.session.get(
+                    "https://api.twitter.com/2/search/adaptive.json", params=param
+                )
                 if adapted.status == 200:
                     break
                 tries -= 1
@@ -166,8 +167,14 @@ class TwitterSearch:
             raise Exception(f"Expected timeline dict. Got none or invalid data.")
         return timeline, global_objects
 
-    async def stream(self, query, limit=-1, mode="top",
-                     initial_track: bool = False, refresh_rate: float = 5.0):
+    async def stream(
+        self,
+        query,
+        limit=-1,
+        mode="top",
+        initial_track: bool = False,
+        refresh_rate: float = 5.0,
+    ):
         """
         Stream a list of tweets from with a query.
 
@@ -184,17 +191,18 @@ class TwitterSearch:
         """
         count = 20
 
-        args = {**self.search_base,
-                "q": query,
-                "tweet_search_mode": mode,
-                "count": count,
-                "query_source": "spelling_suggestion_click",
-                "cursor": None,
-                "spelling_corrections": 1,
-                "include_ext_edit_control": 0,
-                "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
-                       "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe"
-                }
+        args = {
+            **self.search_base,
+            "q": query,
+            "tweet_search_mode": mode,
+            "count": count,
+            "query_source": "spelling_suggestion_click",
+            "cursor": None,
+            "spelling_corrections": 1,
+            "include_ext_edit_control": 0,
+            "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
+            "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
+        }
         self.session.do_headers("https://twitter.com/")
         initial_track = not initial_track  # Just invert it lol
         while True:
@@ -211,10 +219,7 @@ class TwitterSearch:
                 if list(i.keys())[0] == "addEntries":
                     # Bottom to top.
                     reverse = list(reversed(i["addEntries"]["entries"]))
-                    for entry in self.iter_entries(
-                            reverse,
-                            global_objects
-                    ):
+                    for entry in self.iter_entries(reverse, global_objects):
                         if entry.get("type") == "cursor":
                             cursor[entry["direction"]] = entry
                         else:
@@ -227,8 +232,7 @@ class TwitterSearch:
                                 break
                 elif list(i.keys())[0] == "replaceEntry":
                     for entry in self.iter_entries(
-                            i["addEntries"]["entries"],
-                            global_objects
+                        i["addEntries"]["entries"], global_objects
                     ):
                         if entry.get("type") == "cursor":
                             cursor[entry["direction"]] = entry
@@ -243,13 +247,16 @@ class TwitterSearch:
         for entry in entries:
             entry_id = entry["entryId"]
             # print(entry_id)
-            if entry_id.startswith("tweet-") or \
-                    entry_id.startswith("sq-I-t-"):
-                yield {"type": "tweet", **self.unpack_tweet(entry, entry_globals, entry_id)}
-            elif entry_id.startswith("cursor") or \
-                    entry_id.startswith("sq-C"):
-                yield {"type": "cursor",
-                       **self.unpack_cursor(entry_id, entry["content"])}
+            if entry_id.startswith("tweet-") or entry_id.startswith("sq-I-t-"):
+                yield {
+                    "type": "tweet",
+                    **self.unpack_tweet(entry, entry_globals, entry_id),
+                }
+            elif entry_id.startswith("cursor") or entry_id.startswith("sq-C"):
+                yield {
+                    "type": "cursor",
+                    **self.unpack_cursor(entry_id, entry["content"]),
+                }
 
     def unpack_cursor(self, entry_id, cursor: dict):
         content = cursor.get("content", {})
@@ -258,7 +265,6 @@ class TwitterSearch:
             raise Exception("Cursor Content missing?")
         else:
             if entry_id.startswith("sq-C"):
-
                 content = operation["cursor"]
                 return {
                     "direction": content.get("cursorType").lower(),
@@ -273,7 +279,11 @@ class TwitterSearch:
 
     def unpack_tweet(self, entryData: dict, entry_globals: dict, entry_id: str):
         if entryData.get("__typename") == "TimelineTimelineItem":
-            tweet = entryData.get("itemContent", {}).get("tweet_results", {}).get("result", {})
+            tweet = (
+                entryData.get("itemContent", {})
+                .get("tweet_results", {})
+                .get("result", {})
+            )
             if not tweet:
                 raise Exception("Tweet data missing? [Timeline V2]")
             tweet = UtilBox.common_tweet(tweet, None)
@@ -286,6 +296,5 @@ class TwitterSearch:
             tweet = UtilBox.common_tweet(tweet, entry_globals)
         else:
             raise Exception("Unseen Tweet type? [Unknown Timeline]")
-
 
         return {"tweet": tweet, "user": tweet.user}

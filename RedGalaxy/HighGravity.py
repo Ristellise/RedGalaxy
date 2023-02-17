@@ -34,9 +34,9 @@ class HighGravity:
         self.logging.debug("Content found.")
 
         soup = BeautifulSoup(await r.text(), "lxml")
-        r = re.compile("\"(.*?)\":\"(.*?)\"")
-        ra = re.compile(",(.*?):\"(.*?)\"")
-        r2 = re.compile("\"https://abs.twimg.com/(.*?)/\"")
+        r = re.compile('"(.*?)":"(.*?)"')
+        ra = re.compile(',(.*?):"(.*?)"')
+        r2 = re.compile('"https://abs.twimg.com/(.*?)/"')
         rba_f = None
         routes = {}
         c = 0
@@ -52,7 +52,9 @@ class HighGravity:
                 for i in rab:
                     if i[0] == "api" and len(i[1]) == 7:
                         self.logging.debug(f"Regex Matched: {i[0]} {i[1]}")
-                        ra = await self.process_js("https://abs.twimg.com/", rba_f, i[0], i[1])
+                        ra = await self.process_js(
+                            "https://abs.twimg.com/", rba_f, i[0], i[1]
+                        )
                         if ra is None:
                             continue
                         for route_key, route_data in ra.items():
@@ -64,7 +66,9 @@ class HighGravity:
                         if rba_f is None:
                             continue
                         self.logging.debug(f"Regex Matched: {match[0]} {match[1]}")
-                        ra = await self.process_js("https://abs.twimg.com/", rba_f, match[0], match[1])
+                        ra = await self.process_js(
+                            "https://abs.twimg.com/", rba_f, match[0], match[1]
+                        )
                         if ra is None:
                             continue
                         for route_key, route_data in ra.items():
@@ -72,11 +76,7 @@ class HighGravity:
                 # print(rb)
         return routes
 
-    filtered = [
-        "AudioSpaces",
-        "UsersGraphQL",
-        "api"
-    ]
+    filtered = ["AudioSpaces", "UsersGraphQL", "api"]
 
     async def process_js(self, root, mode, route, hash):
         process = False
@@ -102,8 +102,8 @@ class HighGravity:
                 # print(type(c), c)
                 if isinstance(c, js2py.base.JsObjectWrapper):
                     url = f"https://api.twitter.com/graphql/{c['queryId']}/{c['operationName']}"
-                    features = c['metadata']
-                    final_routes[c['operationName']] = [url, features]
+                    features = c["metadata"]
+                    final_routes[c["operationName"]] = [url, features]
                 else:
                     raise Exception(f"Export string changed or invalid?")
             return final_routes
