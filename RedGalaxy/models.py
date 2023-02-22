@@ -42,8 +42,7 @@ class Media:
 @dataclasses.dataclass
 class UploadMedia:
     path: pathlib.Path
-    media_type: str
-    media_category: str
+    alt: typing.Optional[str] = None
 
 
 @dataclasses.dataclass

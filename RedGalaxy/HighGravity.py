@@ -12,7 +12,7 @@ class HighGravity:
     def __init__(self, sessionInstance: SessionManager = None):
         """
         HighGravity loads twitter's JS files and extracts graphql routes to ensure
-        that the routeIds used are the latest ones for the routes required by the rest of the
+        that the routeIds used are up-to-date for the routes required by the rest of the
         other params.
         :param sessionInstance:
         """

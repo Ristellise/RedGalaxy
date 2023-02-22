@@ -1,11 +1,17 @@
 import json
 import logging
+import typing
 
-from . import global_instance, SessionManager, HighGravity, User, UtilBox
+from . import global_instance, SessionManager, HighGravity, User, UtilBox, UploadMedia, Tweet
 
 
 class TwitterUser:
     def __init__(self, sessionInstance: SessionManager = None):
+        """
+        Routes relating to getting tweets and users.
+
+        :param sessionInstance:
+        """
         if sessionInstance is None:
             sessionInstance = global_instance
         self.session = sessionInstance
@@ -31,7 +37,7 @@ class TwitterUser:
 
     async def get_user(self, username: [str, User]):
         """
-        Retrieves a User by it's username/screenname.
+        Retrieves a User by its username/screenname.
         :param username: The user's username. (e.g. Twitter)
         :return: A User object containing the user's information.
         """
@@ -98,7 +104,12 @@ class TwitterUser:
         "responsive_web_enhance_cards_enabled": False,
     }
 
-    async def get_tweet(self, tweet_id: int):
+    async def get_tweet(self, tweet_id: int) -> typing.Optional[Tweet]:
+        """
+        Get a tweet by its snowflake/tweet_id
+        :param tweet_id: The tweet ID as an integer. E.G (1564598913784549376).
+        :return: a Tweet Object. May return None if the tweet has been deleted or doesn't exist.
+        """
         routes = await self.routes
 
         variables = {

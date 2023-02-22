@@ -143,6 +143,9 @@ class TwitterSearch:
         adapted = await self.session.get(
             "https://api.twitter.com/2/search/adaptive.json", params=param
         )
+        # Twitter may not return a rate limit remaning in the header.
+        # In thise case, assume that the request was successful and re-get tokens
+
         if adapted.headers.get("x-rate-limit-remaining", 0) == 0:
             await self.session.guest_token()
             self.session.do_headers("https://twitter.com/", guest_token=True)
@@ -173,14 +176,14 @@ class TwitterSearch:
         limit=-1,
         mode="top",
         initial_track: bool = False,
-        refresh_rate: float = 5.0,
+        refresh_rate: float = 30.0,
     ):
         """
         Stream a list of tweets from with a query.
 
         Note: This stream does not backtrack when it reaches a max number of 20 tweets.
 
-        TODO: Allow backtracking eventually. It is possible to backtrack but it probably needs tweet counting.
+        TODO: Allow backtracking eventually. It is possible to backtrack, but it probably needs tweet counting.
 
         :param query: The query term to be placed in the search
         :param limit: The max number of tweets to be retrieved before exiting.
