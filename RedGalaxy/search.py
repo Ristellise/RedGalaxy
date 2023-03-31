@@ -1,7 +1,7 @@
 import asyncio
-import typing
+import urllib.parse
 
-from . import global_instance, SessionManager, UtilBox
+from . import global_instance, SessionManager, UtilBox, RedGalaxyException
 
 
 class TwitterSearch:
@@ -13,6 +13,7 @@ class TwitterSearch:
         if session_instance is None:
             session_instance = global_instance
         self.session = session_instance
+        self.logging = self.session.logging.getChild("TwitterSearch")
 
     search_base = {
         # Users
@@ -94,22 +95,28 @@ class TwitterSearch:
             "q": query,
             "tweet_search_mode": mode,
             "count": count,
-            "query_source": "spelling_suggestion_click",
+            "query_source": "spelling_expansion_revert_click",
             "cursor": None,
+            "pc": 1,
             "spelling_corrections": 1,
-            "include_ext_edit_control": 0,
+            "include_ext_edit_control": True,
             "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
             "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
         }
-        await self.session.guest_token()
-        self.session.do_headers("https://twitter.com/", guest_token=True)
-
+        referer = "https://twitter.com/search?" + urllib.parse.urlencode(
+            {
+                "f": "live",
+                "lang": "en",
+                "q": query,
+                "src": "spelling_expansion_revert_click",
+            }
+        )
         while True:
             param = args.copy()
             if param["cursor"] is None:
                 del param["cursor"]
 
-            timeline, global_objects = await self.get_timeline(param)
+            timeline, global_objects = await self.get_timeline(param, referer)
             args["cursor"] = None
             # Get Current run Cursors
             cursor = {"top": None, "bottom": None}
@@ -137,32 +144,42 @@ class TwitterSearch:
                             cursor[entry["direction"]] = entry
             if limit == 0:
                 return
+            self.logging.debug(f"RunCount: {run_count} Expecting? {run_count > 20}")
             args["cursor"] = cursor["bottom"]["value"]
 
-    async def get_timeline(self, param: dict):
-        adapted = await self.session.get(
-            "https://api.twitter.com/2/search/adaptive.json", params=param
-        )
-        # Twitter may not return a rate limit remaning in the header.
-        # In thise case, assume that the request was successful and re-get tokens
+    async def get_timeline(self, param: dict, referer):
+        tries = 5
+        adapted = None
+        while tries > 0:
+            adapted = await self.session.get(
+                "https://api.twitter.com/2/search/adaptive.json",
+                params=param,
+                referer=referer,
+            )
+            # Twitter may not return a rate limit remaining in the header.
+            # In this case, assume that the request was successful and re-get tokens
 
-        if adapted.headers.get("x-rate-limit-remaining", 0) == 0:
-            await self.session.guest_token()
-            self.session.do_headers("https://twitter.com/", guest_token=True)
-        if adapted.status == 503:
-            await asyncio.sleep(5)
-            tries = 5
-            while tries > 0:
-                adapted = await self.session.get(
-                    "https://api.twitter.com/2/search/adaptive.json", params=param
-                )
-                if adapted.status == 200:
-                    break
+            if adapted.headers.get("x-rate-limit-remaining", 0) == 0:
+                await self.session.ensure_token(retry=True)
                 tries -= 1
-        if adapted.status != 200:
-            print(await adapted.text())
-            raise Exception(f"Adaptive json returned {adapted.status}. Expected 200.")
-        j_data: dict = await adapted.json()
+                continue
+            if adapted.status_code == 503:
+                tries -= 1
+                continue
+            if adapted.status_code == 429:
+                await self.session.ensure_token(retry=True)
+                tries -= 1
+                continue
+            if adapted.status_code != 200:
+                print(await adapted.text())
+                raise RedGalaxyException(
+                    f"Adaptive json returned {adapted.status}. Expected 200."
+                )
+            else:
+                break
+        if adapted is None:
+            raise RedGalaxyException("Gave up Trying.")
+        j_data: dict = adapted.json()
 
         global_objects = j_data.get("globalObjects", {})
         timeline = j_data.get("timeline", {})
@@ -199,14 +216,14 @@ class TwitterSearch:
             "q": query,
             "tweet_search_mode": mode,
             "count": count,
-            "query_source": "spelling_suggestion_click",
+            "query_source": "spelling_expansion_revert_click",
             "cursor": None,
+            "pc": "1",
             "spelling_corrections": 1,
-            "include_ext_edit_control": 0,
+            "include_ext_edit_control": "true",
             "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
             "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
         }
-        self.session.do_headers("https://twitter.com/")
         initial_track = not initial_track  # Just invert it lol
         while True:
             param = args.copy()
@@ -267,13 +284,19 @@ class TwitterSearch:
         if not content and not operation:
             raise Exception("Cursor Content missing?")
         else:
+            print(entry_id, cursor)
             if entry_id.startswith("sq-C"):
                 content = operation["cursor"]
                 return {
                     "direction": content.get("cursorType").lower(),
                     "value": content.get("value"),
                 }
-
+            elif entry_id.startswith("cursor-"):
+                content = operation["cursor"]
+                return {
+                    "direction": content.get("cursorType").lower(),
+                    "value": content.get("value"),
+                }
             else:
                 return {
                     "direction": content.get("cursorType").lower(),
@@ -290,7 +313,7 @@ class TwitterSearch:
             if not tweet:
                 raise Exception("Tweet data missing? [Timeline V2]")
             tweet = UtilBox.common_tweet(tweet, None)
-        elif entry_id.startswith("sq-I-t-"):
+        elif entry_id.startswith("sq-I-t-") or entry_id.startswith("tweet-"):
             tweet_mini = entryData.get("content", {}).get("item", {})
             if not tweet_mini:
                 raise Exception("Tweet Pointer data missing? [Search Timeline]")
@@ -298,6 +321,6 @@ class TwitterSearch:
             tweet = entry_globals["tweets"][str(tweet_mini["content"]["tweet"]["id"])]
             tweet = UtilBox.common_tweet(tweet, entry_globals)
         else:
-            raise Exception("Unseen Tweet type? [Unknown Timeline]")
+            raise Exception(f"Unseen Tweet type? [Unknown Timeline]: {entryData}")
 
         return {"tweet": tweet, "user": tweet.user}

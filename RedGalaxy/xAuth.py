@@ -19,11 +19,11 @@ class xAuth:
         :return: None or a oauth token.
         """
 
-        await self.session.guest_token()
-
         # Authorization code adapted from oxtwitter.cpp on github:
         # (https://github.com/SimoDax/Bird10/blob/master/Bird10HeadlessService/src/o2/oxtwitter.cpp)
         # This appears to be an older/modified version of o2. So I'm not too sure of the license
+
+
 
         # It appears it's the same as what twitter uses.
         data = {
@@ -41,6 +41,8 @@ class xAuth:
                 "Bearer Only token is not allowed. "
                 "Route only available to consumer based access."
             )
+
+        response = await self.session.post()
 
         response = await self.session.post(
             "https://api.twitter.com/auth/1/xauth_password.json",

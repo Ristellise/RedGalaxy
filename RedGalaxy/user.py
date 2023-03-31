@@ -2,7 +2,15 @@ import json
 import logging
 import typing
 
-from . import global_instance, SessionManager, HighGravity, User, UtilBox, UploadMedia, Tweet
+from . import (
+    global_instance,
+    SessionManager,
+    HighGravity,
+    User,
+    UtilBox,
+    UploadMedia,
+    Tweet,
+)
 
 
 class TwitterUser:
@@ -35,7 +43,7 @@ class TwitterUser:
             self._routes = await self.gravity.retrieve_routes()
         return self._routes
 
-    async def get_user(self, username: [str, User]):
+    async def get_user(self, username: typing.Union[str, User]):
         """
         Retrieves a User by its username/screenname.
         :param username: The user's username. (e.g. Twitter)
@@ -53,36 +61,114 @@ class TwitterUser:
             "withSafetyModeUserFields": False,
             "withSuperFollowsUserFields": True,
         }
-
-        if routes.get("UserByScreenName"):
-            route = routes.get("UserByScreenName")
-            url = route[0]
-
-            # Twitter raises an error if we have a missing feature not present in the list.
-            # We could just look at the defaults but at the same time,
-            # it would be better to not follow blindly.
-            set_features = list(self.getUserFeatures.keys())
-            for feature in route[1]["featureSwitches"]:
-                if feature not in set_features:
-                    self.logging.warning(
-                        f"!! {feature} found in featureSwitch but missing in setFeatures."
-                    )
-            a = await self.session.get(
-                url,
-                params={
-                    "variables": json.dumps(variables).replace(" ", ""),
-                    "features": json.dumps(self.getUserFeatures).replace(" ", ""),
-                },
-            )
-            # print(a)
-            data: dict = await a.json()
-            true_user = data["data"]["user"]["result"]["legacy"]
-            true_user["id"] = data["data"]["user"]["result"]["rest_id"]
-            return UtilBox.make_user(true_user)
-        else:
+        route = routes.get("UserByScreenName")
+        if not route:
             print("Routes list:")
             print(routes)
             raise Exception("Missing routes?")
+        url = route[0]
+
+        # Twitter raises an error if we have a missing feature not present in the list.
+        # We could just look at the defaults but at the same time,
+        # it would be better to not follow blindly.
+        set_features = list(self.getUserFeatures.keys())
+        for feature in route[1]["featureSwitches"]:
+            if feature not in set_features:
+                self.logging.warning(
+                    f"!! {feature} found in featureSwitch but missing in setFeatures."
+                )
+        a = await self.session.get(
+            url,
+            params={
+                "variables": json.dumps(variables).replace(" ", ""),
+                "features": json.dumps(self.getUserFeatures).replace(" ", ""),
+            },
+        )
+        # print(a)
+        data: dict = await a.json()
+        true_user = data["data"]["user"]["result"]["legacy"]
+        true_user["id"] = data["data"]["user"]["result"]["rest_id"]
+        return UtilBox.make_user(true_user)
+
+    getUserIdFeatures = {
+        "responsive_web_twitter_blue_verified_badge_is_enabled": True,
+        "responsive_web_graphql_exclude_directive_enabled": True,
+        "verified_phone_label_enabled": False,
+        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+        "responsive_web_graphql_timeline_navigation_enabled": True,
+    }
+
+    async def get_user_by_id(
+        self, *users: typing.Union[int, User]
+    ) -> typing.Optional[User]:
+        user_id_str = []
+        for user_id in users:
+            uid = None
+            if isinstance(user_id, User):
+                if user_id.id is None:
+                    raise Exception("Malformed User data? Expected username to exist.")
+            elif isinstance(user_id, int):
+                uid = user_id
+            elif isinstance(user_id, str):
+                uid = int(user_id)  # Test for an integer.
+            else:
+                raise Exception(f"{user_id} is not a int or User object.")
+
+            user_id_str.append(str(uid))
+        routes = await self.routes
+
+        variables = {
+            "userIds": user_id_str,
+            "withSafetyModeUserFields": False,
+        }
+
+        route = routes.get("UsersByRestIds")
+        if not route:
+            print("Routes list:")
+            print(routes)
+            raise Exception("Missing routes?")
+        url = route[0]
+
+        # Twitter raises an error if we have a missing feature not present in the list.
+        # We could just look at the defaults but at the same time,
+        # it would be better to not follow blindly.
+        features = self.getUserIdFeatures
+        set_features = list(features.keys())
+        for feature in route[1]["featureSwitches"]:
+            if feature not in set_features:
+                self.logging.warning(
+                    f"{feature} found in featureSwitch but missing in setFeatures."
+                )
+        await self.session.guest_token()
+        replaced = url.replace("https://api.twitter.com/", "https://twitter.com/i/api/")
+
+        a = await self.session.get(
+            replaced,
+            params={
+                "variables": json.dumps(variables).replace(" ", ""),
+                "features": json.dumps(features).replace(" ", ""),
+            },
+            guest_token=True,
+        )
+
+        data: dict = await a.json()
+        inner_data: dict = data.get("data", {})
+        if inner_data:
+            if len(user_id_str) == 1:
+                inner_data["users"][0]["result"]["legacy"]["id"] = user_id_str[0]
+                return UtilBox.make_user(inner_data["users"][0]["result"]["legacy"])
+            else:
+                users = []
+                for idx, user in enumerate(inner_data["users"]):
+                    if user:
+                        user["result"]["legacy"]["id"] = user_id_str[idx]
+                        user = UtilBox.make_user(user["result"]["legacy"])
+                        users.append(user)
+                    else:
+                        users.append(None)
+                return users
+
+        return None
 
     getTweetFeatures = {
         "responsive_web_twitter_blue_verified_badge_is_enabled": True,
@@ -128,42 +214,43 @@ class TwitterUser:
             "withV2Timeline": True,
         }
 
-        if routes.get("TweetDetail"):
-            route = routes.get("TweetDetail")
-            url = route[0]
+        route = routes.get("TweetDetail")
+        if not route:
+            print("Routes list:")
+            print(routes)
+            raise Exception("Missing routes?")
+        url = route[0]
 
-            # Twitter raises an error if we have a missing feature not present in the list.
-            # We could just look at the defaults but at the same time,
-            # it would be better to not follow blindly.
-            features = self.getTweetFeatures
-            set_features = list(features.keys())
-            for feature in route[1]["featureSwitches"]:
-                if feature not in set_features:
-                    self.logging.warning(
-                        f"{feature} found in featureSwitch but missing in setFeatures."
-                    )
-            await self.session.guest_token()
-            replaced = url.replace(
-                "https://api.twitter.com/", "https://twitter.com/i/api/"
-            )
-            a = await self.session.get(
-                replaced,
-                params={
-                    "variables": json.dumps(variables).replace(" ", ""),
-                    "features": json.dumps(features).replace(" ", ""),
-                },
-                guest_token=True,
-            )
-            data: dict = await a.json()
-            inner_data: dict = data.get("data", {})
-            for instruction in inner_data[
-                "threaded_conversation_with_injections_v2"
-            ].get("instructions"):
-                type_instruct = instruction["type"]
-                if type_instruct == "TimelineAddEntries":
-                    for entry in instruction["entries"]:
-                        if entry["entryId"].startswith("tweet-"):
-                            base_tweet = entry["content"]["itemContent"][
-                                "tweet_results"
-                            ]["result"]
-                            return UtilBox.common_tweet(base_tweet, None)
+        # Twitter raises an error if we have a missing feature not present in the list.
+        # We could just look at the defaults but at the same time,
+        # it would be better to not follow blindly.
+        features = self.getTweetFeatures
+        set_features = list(features.keys())
+        for feature in route[1]["featureSwitches"]:
+            if feature not in set_features:
+                self.logging.warning(
+                    f"{feature} found in featureSwitch but missing in setFeatures."
+                )
+        await self.session.guest_token()
+        replaced = url.replace("https://api.twitter.com/", "https://twitter.com/i/api/")
+        a = await self.session.get(
+            replaced,
+            params={
+                "variables": json.dumps(variables).replace(" ", ""),
+                "features": json.dumps(features).replace(" ", ""),
+            },
+            guest_token=True,
+        )
+        data: dict = await a.json()
+        inner_data: dict = data.get("data", {})
+        for instruction in inner_data["threaded_conversation_with_injections_v2"].get(
+            "instructions"
+        ):
+            type_instruct = instruction["type"]
+            if type_instruct == "TimelineAddEntries":
+                for entry in instruction["entries"]:
+                    if entry["entryId"].startswith("tweet-"):
+                        base_tweet = entry["content"]["itemContent"]["tweet_results"][
+                            "result"
+                        ]
+                        return UtilBox.common_tweet(base_tweet, None)

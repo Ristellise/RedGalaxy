@@ -3,13 +3,17 @@ import datetime
 import pathlib
 import typing
 
+try:
+    from mashumaro.mixins.orjson import DataClassORJSONMixin as MashuMaroORJSONMixin
+except ImportError:
+    MashuMaroORJSONMixin = object
 
 # Adapted from  SNScrape
 # (https://github.com/JustAnotherArchivist/snscrape/blob/master/snscrape/modules/twitter.py)
 
 
 @dataclasses.dataclass
-class Media:
+class Media(MashuMaroORJSONMixin):
     display_url: str
     expanded_url: str
     id: int
@@ -40,20 +44,20 @@ class Media:
 
 
 @dataclasses.dataclass
-class UploadMedia:
+class UploadMedia(MashuMaroORJSONMixin):
     path: pathlib.Path
     alt: typing.Optional[str] = None
 
 
 @dataclasses.dataclass
-class VideoVariant:
+class VideoVariant(MashuMaroORJSONMixin):
     bitrate: int
     content_type: str
     url: str
 
 
 @dataclasses.dataclass
-class VideoMeta:
+class VideoMeta(MashuMaroORJSONMixin):
     aspect: typing.List[int]
     duration: float
     variants: typing.List[VideoVariant]
@@ -89,7 +93,7 @@ class ExtendedMedia(Media):
 
 
 @dataclasses.dataclass
-class Tweet:
+class Tweet(MashuMaroORJSONMixin):
     id: int
     date: datetime.datetime
 
@@ -117,7 +121,7 @@ class Tweet:
 
 
 @dataclasses.dataclass
-class UserCounts:
+class UserCounts(MashuMaroORJSONMixin):
     followers: typing.Optional[int] = None
     friends: typing.Optional[int] = None
     statuses: typing.Optional[int] = None
@@ -127,7 +131,7 @@ class UserCounts:
 
 
 @dataclasses.dataclass
-class User:
+class User(MashuMaroORJSONMixin):
     username: str
     description: str
     id: int

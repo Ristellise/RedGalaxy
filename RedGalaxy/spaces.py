@@ -15,4 +15,5 @@ class TwitterSpaces:
         self.session = session_instance
         self.gravity = HighGravity(self.session)
 
-    async def GetSpaceById(self):
+    async def GetSpaceById(self, space_id):
+        pass
