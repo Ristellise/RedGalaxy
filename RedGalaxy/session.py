@@ -5,13 +5,13 @@ import json
 import logging
 import pathlib
 import random
-import typing
 
-import httpx, time
+import httpx
+import time
 
 from .exceptions import SessionManagerException
 
-# Nitter's Bear token. A bit old but it works as of 03/02/2023
+# Nitter's Bear token. A bit old, but it works as of 03/02/2023
 _DEFAULT_BEARER = "AAAAAAAAAAAAAAAAAAAAAPYXBAAAAAAACLXUNDekMxqa8h%2F40K4moUkGsoc%3DTYfbDKbT3jJPCEVnMYqilB28NHfOPqkca3qaAxGfsyKCs0wRbw"
 
 
@@ -51,11 +51,11 @@ class TokenManager:
 
 class SessionManager:
     def __init__(
-            self,
-            mode: SessionMode,
-            key=None,
-            secret=None,
-            tokenManager: TokenManager = None,
+        self,
+        mode: SessionMode,
+        key=None,
+        secret=None,
+        tokenManager: TokenManager = None,
     ):
         if mode == SessionMode.BEARER:
             self.consumer = None
@@ -78,10 +78,13 @@ class SessionManager:
         self.logging.debug(f"Writing Headers, set_auth: {set_auth}, referer: {referer}")
 
         if self.auth is None and not self.is_bearer:
-
+            raise NotImplementedError(
+                "Non-Bearer tokens are currently not working at the moment!"
+            )
+            # await self.get_access_token()
         self.headers = {
             "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                          f"Chrome/109.0.0.0 Safari/537.{random.randint(0, 99)}",
+            f"Chrome/109.0.0.0 Safari/537.{random.randint(0, 99)}",
             "Authorization": self.auth,
             "Referer": referer,
             "Accept-Language": "en-US,en;q=0.5",
@@ -125,11 +128,11 @@ class SessionManager:
         return self._session
 
     async def get(
-            self,
-            url,
-            referer="https://twitter.com/",
-            set_auth=True,
-            **kwargs,
+        self,
+        url,
+        referer="https://twitter.com/",
+        set_auth=True,
+        **kwargs,
     ):
         await self.get_access_token()
         await self.do_headers(referer, set_auth)
@@ -146,12 +149,12 @@ class SessionManager:
         return resp
 
     async def post(
-            self,
-            url,
-            referer="https://twitter.com/",
-            set_auth=True,
-            skip_access_check=False,
-            **kwargs,
+        self,
+        url,
+        referer="https://twitter.com/",
+        set_auth=True,
+        skip_access_check=False,
+        **kwargs,
     ):
         if not skip_access_check:
             await self.get_access_token()

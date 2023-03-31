@@ -23,8 +23,6 @@ class xAuth:
         # (https://github.com/SimoDax/Bird10/blob/master/Bird10HeadlessService/src/o2/oxtwitter.cpp)
         # This appears to be an older/modified version of o2. So I'm not too sure of the license
 
-
-
         # It appears it's the same as what twitter uses.
         data = {
             "x_auth_identifier": self.username,
