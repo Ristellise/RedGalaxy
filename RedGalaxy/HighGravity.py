@@ -1,29 +1,29 @@
 import logging
 import re
 
-from . import global_instance, SessionManager
-from bs4 import BeautifulSoup
 import js2py
+from bs4 import BeautifulSoup
+
+from . import SessionManager, BaseTwitter
 
 
-class HighGravity:
+class HighGravity(BaseTwitter):
     magic = "a"
 
-    def __init__(self, sessionInstance: SessionManager = None):
+    def __init__(self, session_instance: SessionManager = None):
         """
         HighGravity loads twitter's JS files and extracts graphql routes to ensure
         that the routeIds used are up-to-date for the routes required by the rest of the
         other params.
-        :param sessionInstance:
+        :param session_instance:
         """
-        if sessionInstance is None:
-            sessionInstance = global_instance
-        self.session = sessionInstance
+        super().__init__(session_instance)
+        self.session = session_instance
         self.logging = logging.getLogger("HighGravity")
 
     async def retrieve_routes(self):
         """
-        Requests and retireves the routes.
+        Requests and retrieves the routes.
         :return: A dictionary mapped by the route names.
         """
         r = await self.session.get("https://twitter.com", set_auth=False)
@@ -39,7 +39,6 @@ class HighGravity:
         r2 = re.compile('"https://abs.twimg.com/(.*?)/"')
         rba_f = None
         routes = {}
-        c = 0
         for script in soup.select("script"):
             if "endpoints.".lower() in script.text.lower():
                 self.logging.debug("endpoints. found.")

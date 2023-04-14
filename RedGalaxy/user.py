@@ -3,33 +3,31 @@ import logging
 import typing
 
 from . import (
-    global_instance,
     SessionManager,
     HighGravity,
     User,
     UtilBox,
-    UploadMedia,
     Tweet,
+    BaseTwitter,
 )
 
 
-class TwitterUser:
-    def __init__(self, sessionInstance: SessionManager = None):
+class TwitterUser(BaseTwitter):
+    def __init__(self, session_instance: SessionManager = None):
         """
         Routes relating to getting tweets and users.
 
-        :param sessionInstance:
+        :param session_instance:
         """
-        if sessionInstance is None:
-            sessionInstance = global_instance
-        self.session = sessionInstance
+        super().__init__(session_instance)
+        self.session = session_instance
         self.gravity = HighGravity(self.session)
         self._routes = []
         self.logging = logging.getLogger("TwitterUser")
         # I'm not sure if we are going to use a custom bearer in the future...
         self.bearer = ""
 
-    getUserFeatures = {
+    USER_FEATURES = {
         "responsive_web_twitter_blue_verified_badge_is_enabled": True,
         "verified_phone_label_enabled": True,
         "responsive_web_graphql_timeline_navigation_enabled": True,
@@ -71,7 +69,7 @@ class TwitterUser:
         # Twitter raises an error if we have a missing feature not present in the list.
         # We could just look at the defaults but at the same time,
         # it would be better to not follow blindly.
-        set_features = list(self.getUserFeatures.keys())
+        set_features = list(self.USER_FEATURES.keys())
         for feature in route[1]["featureSwitches"]:
             if feature not in set_features:
                 self.logging.warning(
@@ -81,7 +79,7 @@ class TwitterUser:
             url,
             params={
                 "variables": json.dumps(variables).replace(" ", ""),
-                "features": json.dumps(self.getUserFeatures).replace(" ", ""),
+                "features": json.dumps(self.USER_FEATURES).replace(" ", ""),
             },
         )
         # print(a)
@@ -90,7 +88,7 @@ class TwitterUser:
         true_user["id"] = data["data"]["user"]["result"]["rest_id"]
         return UtilBox.make_user(true_user)
 
-    getUserIdFeatures = {
+    USER_ID_FEATURES = {
         "responsive_web_twitter_blue_verified_badge_is_enabled": True,
         "responsive_web_graphql_exclude_directive_enabled": True,
         "verified_phone_label_enabled": False,
@@ -132,7 +130,7 @@ class TwitterUser:
         # Twitter raises an error if we have a missing feature not present in the list.
         # We could just look at the defaults but at the same time,
         # it would be better to not follow blindly.
-        features = self.getUserIdFeatures
+        features = self.USER_ID_FEATURES
         set_features = list(features.keys())
         for feature in route[1]["featureSwitches"]:
             if feature not in set_features:
@@ -170,7 +168,7 @@ class TwitterUser:
 
         return None
 
-    getTweetFeatures = {
+    TWEET_FEATURE = {
         "responsive_web_twitter_blue_verified_badge_is_enabled": True,
         "responsive_web_graphql_exclude_directive_enabled": False,
         "verified_phone_label_enabled": False,
@@ -224,7 +222,7 @@ class TwitterUser:
         # Twitter raises an error if we have a missing feature not present in the list.
         # We could just look at the defaults but at the same time,
         # it would be better to not follow blindly.
-        features = self.getTweetFeatures
+        features = self.TWEET_FEATURE
         set_features = list(features.keys())
         for feature in route[1]["featureSwitches"]:
             if feature not in set_features:

@@ -1,7 +1,4 @@
-import asyncio
-import typing
-
-from . import global_instance, SessionManager, UtilBox, HighGravity
+from . import global_instance, SessionManager, HighGravity
 
 
 class TwitterSpaces:
@@ -15,5 +12,5 @@ class TwitterSpaces:
         self.session = session_instance
         self.gravity = HighGravity(self.session)
 
-    async def GetSpaceById(self, space_id):
+    async def get_space_by_id(self, space_id):
         pass

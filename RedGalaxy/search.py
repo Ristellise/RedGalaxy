@@ -1,18 +1,15 @@
 import asyncio
 import urllib.parse
 
-from . import global_instance, SessionManager, UtilBox, RedGalaxyException
+from . import SessionManager, UtilBox, RedGalaxyException, BaseTwitter
 
 
-class TwitterSearch:
+class TwitterSearch(BaseTwitter):
     def __init__(self, session_instance: SessionManager = None):
         """
-
         :param session_instance:
         """
-        if session_instance is None:
-            session_instance = global_instance
-        self.session = session_instance
+        super().__init__(session_instance)
         self.logging = self.session.logging.getChild("TwitterSearch")
 
     search_base = {
@@ -184,7 +181,7 @@ class TwitterSearch:
         global_objects = j_data.get("globalObjects", {})
         timeline = j_data.get("timeline", {})
         if not timeline:
-            raise Exception(f"Expected timeline dict. Got none or invalid data.")
+            raise Exception("Expected timeline dict. Got none or invalid data.")
         return timeline, global_objects
 
     async def stream(
@@ -225,12 +222,21 @@ class TwitterSearch:
             "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
         }
         initial_track = not initial_track  # Just invert it lol
+
+        referer = "https://twitter.com/search?" + urllib.parse.urlencode(
+            {
+                "f": "live",
+                "lang": "en",
+                "q": query,
+                "src": "spelling_expansion_revert_click",
+            }
+        )
         while True:
             param = args.copy()
             if param["cursor"] is None:
                 del param["cursor"]
 
-            timeline, global_objects = await self.get_timeline(param)
+            timeline, global_objects = await self.get_timeline(param, referer)
             args["cursor"] = None
             # Get Current run Cursors
             cursor = {"top": None, "bottom": None}
@@ -303,10 +309,10 @@ class TwitterSearch:
                     "value": content.get("value"),
                 }
 
-    def unpack_tweet(self, entryData: dict, entry_globals: dict, entry_id: str):
-        if entryData.get("__typename") == "TimelineTimelineItem":
+    def unpack_tweet(self, entry_data: dict, entry_globals: dict, entry_id: str):
+        if entry_data.get("__typename") == "TimelineTimelineItem":
             tweet = (
-                entryData.get("itemContent", {})
+                entry_data.get("itemContent", {})
                 .get("tweet_results", {})
                 .get("result", {})
             )
@@ -314,13 +320,13 @@ class TwitterSearch:
                 raise Exception("Tweet data missing? [Timeline V2]")
             tweet = UtilBox.common_tweet(tweet, None)
         elif entry_id.startswith("sq-I-t-") or entry_id.startswith("tweet-"):
-            tweet_mini = entryData.get("content", {}).get("item", {})
+            tweet_mini = entry_data.get("content", {}).get("item", {})
             if not tweet_mini:
                 raise Exception("Tweet Pointer data missing? [Search Timeline]")
 
             tweet = entry_globals["tweets"][str(tweet_mini["content"]["tweet"]["id"])]
             tweet = UtilBox.common_tweet(tweet, entry_globals)
         else:
-            raise Exception(f"Unseen Tweet type? [Unknown Timeline]: {entryData}")
+            raise Exception(f"Unseen Tweet type? [Unknown Timeline]: {entry_data}")
 
         return {"tweet": tweet, "user": tweet.user}

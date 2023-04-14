@@ -1,12 +1,16 @@
 import dataclasses
 import datetime
-import pathlib
+import io
+import os
 import typing
+
+from . import SessionManager, global_instance
 
 try:
     from mashumaro.mixins.orjson import DataClassORJSONMixin as MashuMaroORJSONMixin
 except ImportError:
     MashuMaroORJSONMixin = object
+
 
 # Adapted from  SNScrape
 # (https://github.com/JustAnotherArchivist/snscrape/blob/master/snscrape/modules/twitter.py)
@@ -44,12 +48,6 @@ class Media(MashuMaroORJSONMixin):
 
 
 @dataclasses.dataclass
-class UploadMedia(MashuMaroORJSONMixin):
-    path: pathlib.Path
-    alt: typing.Optional[str] = None
-
-
-@dataclasses.dataclass
 class VideoVariant(MashuMaroORJSONMixin):
     bitrate: int
     content_type: str
@@ -70,6 +68,7 @@ class ExtendedMedia(Media):
     data_info: typing.Optional[dict] = None
     # Video Only?
     additional_media_info: typing.Optional[dict] = None
+
     # features: typing.Optional[dict] = None
 
     @property
@@ -96,10 +95,9 @@ class ExtendedMedia(Media):
 class Tweet(MashuMaroORJSONMixin):
     id: int
     date: datetime.datetime
-
+    content: str
     # Content is a bit special. For retweets it grabs the retweeted tweet
     # as well as strips the trailing t.co for tweets with media.
-    content: str
     links: typing.List[str]
     user: "User"
     replies: int
@@ -154,3 +152,38 @@ class User(MashuMaroORJSONMixin):
     @classmethod
     def create_blank(cls, username, id):
         return cls(username, "", id, UserCounts(), False)
+
+
+# === Upload Tweets === #
+
+
+@dataclasses.dataclass
+class UploadMedia:
+    """
+    The Media to be uploaded.
+
+    Construction of this dataclass is similar to that of discord.py
+    """
+
+    fp: typing.Union[os.PathLike, io.BytesIO]
+    type: str
+    alt: typing.Optional[str]
+
+    # The following will be filled up once the
+    id: typing.Optional[int]
+    size: typing.Optional[str]
+
+
+@dataclasses.dataclass
+class UploadTweet:
+    status: str
+    media: typing.Optional[typing.List["UploadMedia"]] = None
+    geo: typing.Optional[typing.List[float]] = None
+    card_uri: typing.Optional[str] = ""
+
+
+class BaseTwitter:
+    def __init__(self, session_instance: SessionManager = None):
+        if session_instance is None:
+            session_instance = global_instance
+        self.session = session_instance

@@ -8,6 +8,15 @@ from . import User, Tweet, Media, UserCounts, ExtendedMedia
 class UtilBox:
     @staticmethod
     def make_user(user_data: dict) -> User:
+        """Creates a user object from a legacy user data.
+
+        There is some transforms performed such as:
+         - replacing the profile url with a larger (400x400px variant).
+         - Unfurling urls (removing t.co links into full links)
+
+        :param user_data: The dictionary containing user data.
+        :return: A "User" dataclass.
+        """
         username = user_data.get("screen_name")
         displayname = user_data.get("name")
         description = user_data.get("description")
@@ -54,6 +63,13 @@ class UtilBox:
     def common_tweet(
         true_tweet: dict, entry_globals: typing.Optional[dict], recurse: bool = True
     ):
+        """
+        Creates a Tweet from GraphQL/Web API's
+        :param true_tweet: The "Real" Tweet object
+        :param entry_globals: Entry globals from the search api.
+        :param recurse: Recurse into quote tweets and retweets. You should not need to touch this.
+        :return:
+        """
         if entry_globals:
             user_result = {}
             user_result["legacy"] = entry_globals["users"][str(true_tweet["user_id"])]
@@ -64,7 +80,7 @@ class UtilBox:
             user_result["legacy"]["id"] = true_tweet["core"]["user_results"]["result"][
                 "rest_id"
             ]
-            print("rest_id:", true_tweet["core"]["user_results"]["result"]["rest_id"])
+            # print("rest_id:", true_tweet["core"]["user_results"]["result"]["rest_id"])
             base_tweet = true_tweet["legacy"]
         if entry_globals:
             quoted_tweet = entry_globals["tweets"].get(
@@ -90,6 +106,20 @@ class UtilBox:
             )
         user = UtilBox.make_user(user_result["legacy"])
 
+        return UtilBox.legacy_tweet(base_tweet, quoted_tweet, retweeted_tweet, user)
+
+    @staticmethod
+    def legacy_tweet(
+        base_tweet: dict, quoted_tweet: Tweet, retweeted_tweet: Tweet, user: User
+    ):
+        """
+        Creates a Tweet from a base_tweet, quoted and retweeted tweet.
+        :param base_tweet: The base Tweet.
+        :param quoted_tweet: The quoted Tweet. This needs to be a Tweet object.
+        :param retweeted_tweet: The retweeted Tweet. This needs to be a Tweet object as well.
+        :param user: The User that made the original/base Tweet. Needs to be a User object.
+        :return:
+        """
         content = (
             retweeted_tweet.content if retweeted_tweet else base_tweet.get("full_text")
         )
@@ -175,3 +205,29 @@ class UtilBox:
             retweeted_tweet=retweeted_tweet,
             quoted_tweet=quoted_tweet,
         )
+
+    @staticmethod
+    def api_tweet(api_tweet: dict, recurse: bool = True):
+        """
+        Wraps around
+        :param api_tweet:
+        :param recurse:
+        :return:
+        """
+
+        quoted_tweet = api_tweet.get("quoted_status", None)
+        retweeted_tweet = api_tweet.get("retweeted_status", None)
+
+        if quoted_tweet:
+            if recurse:
+                quoted_tweet = UtilBox.api_tweet(quoted_tweet, recurse=False)
+            else:
+                quoted_tweet = None
+        if retweeted_tweet:
+            if recurse:
+                retweeted_tweet = UtilBox.api_tweet(retweeted_tweet, recurse=False)
+            else:
+                retweeted_tweet = None
+
+        user = UtilBox.make_user(api_tweet["user"])
+        return UtilBox.legacy_tweet(api_tweet, quoted_tweet, retweeted_tweet, user)
