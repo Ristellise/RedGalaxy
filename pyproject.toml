@@ -18,6 +18,8 @@ classifiers = [
 ]
 dependencies = [
   'httpx >= 0.22.0',
+  'Js2Py >= 0.74',
+  'beautifulsoup4 >= 4.10.0'
 ]
 
 [project.urls]
