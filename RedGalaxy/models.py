@@ -93,10 +93,13 @@ class ExtendedMedia(Media):
         else:
             return None
 
+
 @dataclasses.dataclass
 class TombTweet(MashuMaroORJSONMixin):
     id: int
     user: NoneType = None
+
+
 @dataclasses.dataclass
 class Tweet(MashuMaroORJSONMixin):
     id: int

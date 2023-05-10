@@ -2,7 +2,15 @@ import email.utils
 import re
 import typing
 
-from . import RedGalaxyException, TombTweet, User, Tweet, Media, UserCounts, ExtendedMedia
+from . import (
+    RedGalaxyException,
+    TombTweet,
+    User,
+    Tweet,
+    Media,
+    UserCounts,
+    ExtendedMedia,
+)
 
 
 class UtilBox:
@@ -67,7 +75,7 @@ class UtilBox:
             user_result["legacy"]["id"] = true_tweet["core"]["user_results"]["result"][
                 "rest_id"
             ]
-            #print("rest_id:", true_tweet["core"]["user_results"]["result"]["rest_id"])
+            # print("rest_id:", true_tweet["core"]["user_results"]["result"]["rest_id"])
             base_tweet = true_tweet["legacy"]
         if entry_globals:
             quoted_tweet = entry_globals["tweets"].get(
@@ -94,7 +102,9 @@ class UtilBox:
         user = UtilBox.make_user(user_result["legacy"])
 
         content = (
-            retweeted_tweet.content if retweeted_tweet else base_tweet.get("full_text","")
+            retweeted_tweet.content
+            if retweeted_tweet
+            else base_tweet.get("full_text", "")
         )
 
         medias = base_tweet.get("extended_entities", {}).get("media", [])
@@ -180,7 +190,9 @@ class UtilBox:
         )
 
     @staticmethod
-    def iter_timeline_data(timeline:dict, global_objects:dict, limit:int, cursor:dict, run_count=0):
+    def iter_timeline_data(
+        timeline: dict, global_objects: dict, limit: int, cursor: dict, run_count=0
+    ):
         for i in timeline.get("instructions", []):
             entryType = list(i.keys())[0]
             if entryType == "type":
@@ -209,7 +221,7 @@ class UtilBox:
                         i["addEntries"]["entries"], global_objects
                     ):
                         if entry.get("type") == "cursor":
-                            
+
                             cursor[entry["direction"]] = entry
                         else:
                             yield entry
@@ -231,7 +243,7 @@ class UtilBox:
             entry_id = entry["entryId"]
             # print(entry_id)
             if entry_id.startswith("tweet-") or entry_id.startswith("sq-I-t-"):
-                #print(entry)
+                # print(entry)
                 yield {
                     "type": "tweet",
                     **UtilBox.unpack_tweet(entry, entry_globals, entry_id),
@@ -256,7 +268,9 @@ class UtilBox:
         elif entry_id.startswith("sq-I-t-") or entry_id.startswith("tweet-"):
             tweet_mini = entryData.get("content", {})
             if not tweet_mini:
-                raise RedGalaxyException("Tweet Pointer data missing? [Search Timeline]")
+                raise RedGalaxyException(
+                    "Tweet Pointer data missing? [Search Timeline]"
+                )
             if tweet_mini.get("item", None) is not None:
                 tweet_mini = tweet_mini.get("item", None)
             elif "__typename" in tweet_mini:
@@ -267,7 +281,7 @@ class UtilBox:
                     .get("result", {})
                 )
                 if not tweet:
-                    tomb_id = int(entry_id.split('-')[-1])
+                    tomb_id = int(entry_id.split("-")[-1])
                     if tomb_id:
                         tweet = TombTweet(id=tomb_id)
                         return {"tweet": tweet, "user": tweet.user}
@@ -276,17 +290,21 @@ class UtilBox:
                 tweet = UtilBox.common_tweet(tweet, None)
                 return {"tweet": tweet, "user": tweet.user}
             if tweet_mini is None:
-                raise RedGalaxyException("Failed to retrieve tweet_mini [Search Timeline]")
+                raise RedGalaxyException(
+                    "Failed to retrieve tweet_mini [Search Timeline]"
+                )
             tweet = entry_globals["tweets"][str(tweet_mini["content"]["tweet"]["id"])]
             tweet = UtilBox.common_tweet(tweet, entry_globals)
         else:
-            raise RedGalaxyException(f"Unseen Tweet type? [Unknown Timeline]: {entryData}")
+            raise RedGalaxyException(
+                f"Unseen Tweet type? [Unknown Timeline]: {entryData}"
+            )
 
         return {"tweet": tweet, "user": tweet.user}
-    
+
     @staticmethod
     def unpack_cursor(entry_id, cursor: dict):
-        
+
         content = cursor.get("content", {})
         operation = cursor.get("operation", {})
         v2 = True if cursor.get("__typename") else False
@@ -304,16 +322,16 @@ class UtilBox:
                 }
             elif entry_id.startswith("cursor-"):
                 if operation.get("cursor"):
-                    content = operation["cursor"] 
+                    content = operation["cursor"]
                 else:
                     # probably v2
                     content = cursor
                 return {
-                    "direction": content.get("cursorType","").lower(),
+                    "direction": content.get("cursorType", "").lower(),
                     "value": content.get("value"),
                 }
             else:
                 return {
-                    "direction": content.get("cursorType","").lower(),
+                    "direction": content.get("cursorType", "").lower(),
                     "value": content.get("value"),
                 }

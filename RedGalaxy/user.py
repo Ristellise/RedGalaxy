@@ -38,7 +38,7 @@ class TwitterUser:
         "responsive_web_graphql_exclude_directive_enabled": False,
         "blue_business_profile_image_shape_enabled": True,
         "highlights_tweets_tab_ui_enabled": True,
-        "creator_subscriptions_tweet_preview_api_enabled": True
+        "creator_subscriptions_tweet_preview_api_enabled": True,
     }
 
     @property

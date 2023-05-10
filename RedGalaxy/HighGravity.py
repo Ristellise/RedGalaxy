@@ -14,7 +14,7 @@ class HighGravity:
         HighGravity loads twitter's JS files and extracts graphql routes to ensure
         that the routeIds used are up-to-date for the routes required by the rest of the
         other params.
-        :param sessionInstance:
+        :param sessionInstance: A SessionManager instance. If none is provided, it uses the global instance version.
         """
         if sessionInstance is None:
             sessionInstance = global_instance
@@ -29,7 +29,9 @@ class HighGravity:
         r = await self.session.get("https://twitter.com", set_auth=False)
         if r.status_code != 200:
             self.logging.error(r.text)
-            self.logging.error(f"Failed to get routes. Expected 200. Got: {r.status_code}")
+            self.logging.error(
+                f"Failed to get routes. Expected 200. Got: {r.status_code}"
+            )
             return {}
         self.logging.debug("Content found.")
 

@@ -97,7 +97,7 @@ class SessionManager:
         if self._session:
             self._session.headers.clear()
             self._session.headers.update(self.headers)
-        
+
         # I'm personally not sure, 06/05/23 twitter seems to break if you try to get with bearer token?
         if set_auth:
             # Ensure we have Guest Token
@@ -141,7 +141,7 @@ class SessionManager:
         set_auth=True,
         **kwargs,
     ):
-        
+
         await self.get_access_token()
         await self.do_headers(referer, set_auth)
         return await self.request("GET", url, **kwargs)
@@ -173,7 +173,7 @@ class SessionManager:
         if self.access_token:
             return self.access_token
         elif self.consumer[0] and self.consumer[1]:
-            #await self.do_headers("https://twitter.com/")
+            # await self.do_headers("https://twitter.com/")
             encode = base64.standard_b64encode(
                 f"{self.consumer[0]}:{self.consumer[1]}".encode()
             )
@@ -186,7 +186,8 @@ class SessionManager:
                 "Accept-Language": "en-US,en;q=0.5",
             }
             post_token = await self.session.post(
-                "https://api.twitter.com/oauth2/token?grant_type=client_credentials", headers=headers
+                "https://api.twitter.com/oauth2/token?grant_type=client_credentials",
+                headers=headers,
             )
             if post_token.status_code == 200:
                 code: dict = post_token.json()

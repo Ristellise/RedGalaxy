@@ -149,7 +149,7 @@ class TwitterSearch:
             "rawQuery": query,
             "count": count,
             "product": mode,
-            "querySource":"spelling_expansion_revert_click",
+            "querySource": "spelling_expansion_revert_click",
             "cursor": None,
             "includePromotedContent": False
             # "withDownvotePerspective": False,
@@ -169,15 +169,19 @@ class TwitterSearch:
             if param["cursor"] is None:
                 del param["cursor"]
 
-            timeline, global_objects = await self.get_timeline(param, self.featureFlags, route[0])
+            timeline, global_objects = await self.get_timeline(
+                param, self.featureFlags, route[0]
+            )
             args["cursor"] = None
             # Get Current run Cursors
             cursor = {"top": None, "bottom": None}
             run_count = 0
-            for i in UtilBox.iter_timeline_data(timeline, global_objects, limit, cursor):
+            for i in UtilBox.iter_timeline_data(
+                timeline, global_objects, limit, cursor
+            ):
                 run_count += 1
                 yield i
-                
+
             if limit == 0:
                 return
             self.logging.debug(f"RunCount: {run_count} Expecting? {run_count > 20}")
@@ -185,16 +189,16 @@ class TwitterSearch:
             if run_count == 0:
                 break
 
-    async def get_timeline(self, param: dict, features:dict, graphql_url):
+    async def get_timeline(self, param: dict, features: dict, graphql_url):
         tries = 5
         adapted = None
         while tries > 0:
             adapted = await self.session.get(
                 graphql_url,
                 params={
-                "variables": json.dumps(param).replace(" ", ""),
-                "features": json.dumps(features).replace(" ", ""),
-            },
+                    "variables": json.dumps(param).replace(" ", ""),
+                    "features": json.dumps(features).replace(" ", ""),
+                },
             )
             # Twitter may not return a rate limit remaining in the header.
             # In this case, assume that the request was successful and re-get tokens
@@ -221,7 +225,11 @@ class TwitterSearch:
             raise RedGalaxyException("Gave up Trying.")
         j_data: dict = adapted.json()
         self.logging.debug(f"Response: {j_data}")
-        content = j_data.get("data",{}).get("search_by_raw_query",{}).get("search_timeline",{})
+        content = (
+            j_data.get("data", {})
+            .get("search_by_raw_query", {})
+            .get("search_timeline", {})
+        )
         global_objects = content.get("globalObjects", {})
         timeline = content.get("timeline", {})
         if not timeline:
@@ -306,5 +314,3 @@ class TwitterSearch:
                 return
             args["cursor"] = cursor["top"]["value"]
             await asyncio.sleep(refresh_rate)
-
-
