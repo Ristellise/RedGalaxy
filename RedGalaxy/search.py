@@ -1,7 +1,8 @@
 import asyncio
+import json
 import urllib.parse
 
-from . import global_instance, SessionManager, UtilBox, RedGalaxyException
+from . import global_instance, SessionManager, UtilBox, RedGalaxyException, HighGravity
 
 
 class TwitterSearch:
@@ -14,6 +15,8 @@ class TwitterSearch:
             session_instance = global_instance
         self.session = session_instance
         self.logging = self.session.logging.getChild("TwitterSearch")
+        self.gravity = HighGravity(self.session)
+        self._routes = None
 
     search_base = {
         # Users
@@ -78,83 +81,120 @@ class TwitterSearch:
         #      superFollowMetadata,unmentionInfo,editControl,collab_control,vibe
     }
 
-    async def search(self, query, limit=-1, mode="top"):
+    featureFlags = {
+        "rweb_lists_timeline_redesign_enabled": True,
+        "blue_business_profile_image_shape_enabled": True,
+        "responsive_web_graphql_exclude_directive_enabled": False,
+        "verified_phone_label_enabled": False,
+        "creator_subscriptions_tweet_preview_api_enabled": True,
+        "responsive_web_graphql_timeline_navigation_enabled": True,
+        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+        "tweetypie_unmention_optimization_enabled": False,
+        "vibe_api_enabled": True,
+        "responsive_web_edit_tweet_api_enabled": False,
+        "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+        "view_counts_everywhere_api_enabled": True,
+        "longform_notetweets_consumption_enabled": True,
+        "tweet_awards_web_tipping_enabled": False,
+        "freedom_of_speech_not_reach_fetch_enabled": False,
+        "standardized_nudges_misinfo": False,
+        "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": False,
+        "interactive_text_enabled": False,
+        "responsive_web_text_conversations_enabled": True,
+        "longform_notetweets_rich_text_read_enabled": True,
+        "longform_notetweets_inline_media_enabled": True,
+        "responsive_web_enhance_cards_enabled": True,
+    }
+
+    @property
+    async def routes(self):
+        if not self._routes:
+            self._routes = await self.gravity.retrieve_routes()
+        return self._routes
+
+    async def search(self, query, limit=-1, mode="Top"):
         """
         Search for tweets with the specified query.
 
         :param query: The query arguments. Anything on Twitter's /search route works.
         :param limit: Limits then umber of tweets returned. 0 to scrape all.
-        :param mode: The type of search to do. Can be: ["live", "top", "user", "image", "video"]
+        :param mode: The type of search to do. Available modes: ["Top", "People", "Photos", "Videos", "Latest"]
         :return: An async generator of tweets.
         """
 
         count = 20
 
+        routes: dict = await self.routes
+
+        route = routes.get("SearchTimeline")
+        if not route:
+            self.logging.error("Routes list:")
+            self.logging.error(routes)
+            raise Exception("Missing routes?")
+
+        # args = {
+        #     **self.search_base,
+        #     "q": query,
+        #     "tweet_search_mode": mode,
+        #     "count": count,
+        #     "query_source": "spelling_expansion_revert_click",
+        #     "cursor": None,
+        #     "pc": 1,
+        #     "spelling_corrections": 1,
+        #     "include_ext_edit_control": True,
+        #     "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
+        #     "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
+        # }
         args = {
-            **self.search_base,
-            "q": query,
-            "tweet_search_mode": mode,
+            "rawQuery": query,
             "count": count,
-            "query_source": "spelling_expansion_revert_click",
+            "product": mode,
+            "querySource":"spelling_expansion_revert_click",
             "cursor": None,
-            "pc": 1,
-            "spelling_corrections": 1,
-            "include_ext_edit_control": True,
-            "ext": "mediaStats,highlightedLabel,hasNftAvatar,voiceInfo,enrichments,"
-            "superFollowMetadata,unmentionInfo,editControl,collab_control,vibe",
+            "includePromotedContent": False
+            # "withDownvotePerspective": False,
+            # "withReactionsMetadata": False,
+            # "withReactionsPerspective": False,
         }
-        referer = "https://twitter.com/search?" + urllib.parse.urlencode(
-            {
-                "f": "live",
-                "lang": "en",
-                "q": query,
-                "src": "spelling_expansion_revert_click",
-            }
-        )
+        # referer = "https://twitter.com/search?" + urllib.parse.urlencode(
+        #     {
+        #         "f": "live",
+        #         "lang": "en",
+        #         "q": query,
+        #         "src": "spelling_expansion_revert_click",
+        #     }
+        # )
         while True:
             param = args.copy()
             if param["cursor"] is None:
                 del param["cursor"]
 
-            timeline, global_objects = await self.get_timeline(param, referer)
+            timeline, global_objects = await self.get_timeline(param, self.featureFlags, route[0])
             args["cursor"] = None
             # Get Current run Cursors
             cursor = {"top": None, "bottom": None}
             run_count = 0
-
-            for i in timeline.get("instructions"):
-                if list(i.keys())[0] == "addEntries":
-                    for entry in self.iter_entries(
-                        i["addEntries"]["entries"], global_objects
-                    ):
-                        if entry.get("type") == "cursor":
-                            cursor[entry["direction"]] = entry
-                        else:
-                            yield entry
-                            run_count += 1
-                            if limit >= 0:
-                                limit -= 1
-                            if limit == 0:
-                                break
-                elif list(i.keys())[0] == "replaceEntry":
-                    for entry in self.iter_entries(
-                        i["addEntries"]["entries"], global_objects
-                    ):
-                        if entry.get("type") == "cursor":
-                            cursor[entry["direction"]] = entry
+            for i in UtilBox.iter_timeline_data(timeline, global_objects, limit, cursor):
+                run_count += 1
+                yield i
+                
             if limit == 0:
                 return
             self.logging.debug(f"RunCount: {run_count} Expecting? {run_count > 20}")
             args["cursor"] = cursor["bottom"]["value"]
+            if run_count == 0:
+                break
 
-    async def get_timeline(self, param: dict, referer):
+    async def get_timeline(self, param: dict, features:dict, graphql_url):
         tries = 5
         adapted = None
         while tries > 0:
             adapted = await self.session.get(
-                "https://api.twitter.com/2/search/adaptive.json",
-                params=param,
-                referer=referer,
+                graphql_url,
+                params={
+                "variables": json.dumps(param).replace(" ", ""),
+                "features": json.dumps(features).replace(" ", ""),
+            },
             )
             # Twitter may not return a rate limit remaining in the header.
             # In this case, assume that the request was successful and re-get tokens
@@ -171,19 +211,21 @@ class TwitterSearch:
                 tries -= 1
                 continue
             if adapted.status_code != 200:
-                print(await adapted.text())
+                print(adapted.text)
                 raise RedGalaxyException(
-                    f"Adaptive json returned {adapted.status}. Expected 200."
+                    f"Adaptive json returned {adapted.status_code}. Expected 200."
                 )
             else:
                 break
         if adapted is None:
             raise RedGalaxyException("Gave up Trying.")
         j_data: dict = adapted.json()
-
-        global_objects = j_data.get("globalObjects", {})
-        timeline = j_data.get("timeline", {})
+        self.logging.debug(f"Response: {j_data}")
+        content = j_data.get("data",{}).get("search_by_raw_query",{}).get("search_timeline",{})
+        global_objects = content.get("globalObjects", {})
+        timeline = content.get("timeline", {})
         if not timeline:
+            print(content)
             raise Exception(f"Expected timeline dict. Got none or invalid data.")
         return timeline, global_objects
 
@@ -209,6 +251,8 @@ class TwitterSearch:
         :param initial_track: Do we retrieve the initial first 20 tweets?
         :return:
         """
+
+        raise NotImplementedError("TBD once Search has been reimplemented.")
         count = 20
 
         args = {
@@ -263,64 +307,4 @@ class TwitterSearch:
             args["cursor"] = cursor["top"]["value"]
             await asyncio.sleep(refresh_rate)
 
-    def iter_entries(self, entries: list, entry_globals: dict):
-        for entry in entries:
-            entry_id = entry["entryId"]
-            # print(entry_id)
-            if entry_id.startswith("tweet-") or entry_id.startswith("sq-I-t-"):
-                yield {
-                    "type": "tweet",
-                    **self.unpack_tweet(entry, entry_globals, entry_id),
-                }
-            elif entry_id.startswith("cursor") or entry_id.startswith("sq-C"):
-                yield {
-                    "type": "cursor",
-                    **self.unpack_cursor(entry_id, entry["content"]),
-                }
 
-    def unpack_cursor(self, entry_id, cursor: dict):
-        content = cursor.get("content", {})
-        operation = cursor.get("operation", {})
-        if not content and not operation:
-            raise Exception("Cursor Content missing?")
-        else:
-            print(entry_id, cursor)
-            if entry_id.startswith("sq-C"):
-                content = operation["cursor"]
-                return {
-                    "direction": content.get("cursorType").lower(),
-                    "value": content.get("value"),
-                }
-            elif entry_id.startswith("cursor-"):
-                content = operation["cursor"]
-                return {
-                    "direction": content.get("cursorType").lower(),
-                    "value": content.get("value"),
-                }
-            else:
-                return {
-                    "direction": content.get("cursorType").lower(),
-                    "value": content.get("value"),
-                }
-
-    def unpack_tweet(self, entryData: dict, entry_globals: dict, entry_id: str):
-        if entryData.get("__typename") == "TimelineTimelineItem":
-            tweet = (
-                entryData.get("itemContent", {})
-                .get("tweet_results", {})
-                .get("result", {})
-            )
-            if not tweet:
-                raise Exception("Tweet data missing? [Timeline V2]")
-            tweet = UtilBox.common_tweet(tweet, None)
-        elif entry_id.startswith("sq-I-t-") or entry_id.startswith("tweet-"):
-            tweet_mini = entryData.get("content", {}).get("item", {})
-            if not tweet_mini:
-                raise Exception("Tweet Pointer data missing? [Search Timeline]")
-
-            tweet = entry_globals["tweets"][str(tweet_mini["content"]["tweet"]["id"])]
-            tweet = UtilBox.common_tweet(tweet, entry_globals)
-        else:
-            raise Exception(f"Unseen Tweet type? [Unknown Timeline]: {entryData}")
-
-        return {"tweet": tweet, "user": tweet.user}

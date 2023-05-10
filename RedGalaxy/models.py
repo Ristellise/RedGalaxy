@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import pathlib
+from types import NoneType
 import typing
 
 try:
@@ -66,7 +67,8 @@ class VideoMeta(MashuMaroORJSONMixin):
 @dataclasses.dataclass
 class ExtendedMedia(Media):
     ext_media_availability: dict
-    ext_media_color: dict
+    # Not available on newer twitter
+    ext_media_color: typing.Optional[dict] = None
     data_info: typing.Optional[dict] = None
     # Video Only?
     additional_media_info: typing.Optional[dict] = None
@@ -91,7 +93,10 @@ class ExtendedMedia(Media):
         else:
             return None
 
-
+@dataclasses.dataclass
+class TombTweet(MashuMaroORJSONMixin):
+    id: int
+    user: NoneType = None
 @dataclasses.dataclass
 class Tweet(MashuMaroORJSONMixin):
     id: int

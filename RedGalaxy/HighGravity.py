@@ -27,13 +27,13 @@ class HighGravity:
         :return: A dictionary mapped by the route names.
         """
         r = await self.session.get("https://twitter.com", set_auth=False)
-        if r.status != 200:
-            self.logging.error(await r.text())
-            self.logging.error(f"Failed to get routes. Expected 200. Got: {r.status}")
+        if r.status_code != 200:
+            self.logging.error(r.text)
+            self.logging.error(f"Failed to get routes. Expected 200. Got: {r.status_code}")
             return {}
         self.logging.debug("Content found.")
 
-        soup = BeautifulSoup(await r.text(), "lxml")
+        soup = BeautifulSoup(r.text, "lxml")
         r = re.compile('"(.*?)":"(.*?)"')
         ra = re.compile(',(.*?):"(.*?)"')
         r2 = re.compile('"https://abs.twimg.com/(.*?)/"')
@@ -91,8 +91,8 @@ class HighGravity:
             return
         self.logging.debug(f"Retrieving JS content: {js_url}")
         j = await self.session.get(js_url)
-        if j.status == 200:
-            js = await j.text()
+        if j.status_code == 200:
+            js = j.text
             reg = re.compile("({)e\.exports=({+.+?}+)")  # Bit cursed but eh.
             routes = [f"{a}{b}" for a, b in reg.findall(js)]
             final_routes = {}

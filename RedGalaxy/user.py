@@ -3,6 +3,7 @@ import logging
 import typing
 
 from . import (
+    RedGalaxyException,
     global_instance,
     SessionManager,
     HighGravity,
@@ -35,6 +36,9 @@ class TwitterUser:
         "responsive_web_graphql_timeline_navigation_enabled": True,
         "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
         "responsive_web_graphql_exclude_directive_enabled": False,
+        "blue_business_profile_image_shape_enabled": True,
+        "highlights_tweets_tab_ui_enabled": True,
+        "creator_subscriptions_tweet_preview_api_enabled": True
     }
 
     @property
@@ -84,8 +88,11 @@ class TwitterUser:
                 "features": json.dumps(self.getUserFeatures).replace(" ", ""),
             },
         )
+        if a.status_code != 200:
+            self.logging.debug(a.content)
+            raise RedGalaxyException(f"Expected 200. Got {a.status_code}")
         # print(a)
-        data: dict = await a.json()
+        data: dict = a.json()
         true_user = data["data"]["user"]["result"]["legacy"]
         true_user["id"] = data["data"]["user"]["result"]["rest_id"]
         return UtilBox.make_user(true_user)
@@ -151,7 +158,7 @@ class TwitterUser:
             guest_token=True,
         )
 
-        data: dict = await a.json()
+        data: dict = a.json()
         inner_data: dict = data.get("data", {})
         if inner_data:
             if len(user_id_str) == 1:
@@ -231,7 +238,7 @@ class TwitterUser:
                 self.logging.warning(
                     f"{feature} found in featureSwitch but missing in setFeatures."
                 )
-        await self.session.guest_token()
+        await self.session.ensure_token()
         replaced = url.replace("https://api.twitter.com/", "https://twitter.com/i/api/")
         a = await self.session.get(
             replaced,
@@ -241,7 +248,7 @@ class TwitterUser:
             },
             guest_token=True,
         )
-        data: dict = await a.json()
+        data: dict = a.json()
         inner_data: dict = data.get("data", {})
         for instruction in inner_data["threaded_conversation_with_injections_v2"].get(
             "instructions"

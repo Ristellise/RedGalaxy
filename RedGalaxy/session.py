@@ -9,10 +9,12 @@ import random
 import httpx
 import time
 
-from .exceptions import SessionManagerException
+from .exceptions import RedGalaxyException, SessionManagerException
 
 # Nitter's Bear token. A bit old, but it works as of 03/02/2023
 _DEFAULT_BEARER = "AAAAAAAAAAAAAAAAAAAAAPYXBAAAAAAACLXUNDekMxqa8h%2F40K4moUkGsoc%3DTYfbDKbT3jJPCEVnMYqilB28NHfOPqkca3qaAxGfsyKCs0wRbw"
+# _DEFAULT_BEARER = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
+# _DEFAULT_BEARER = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
 
 class SessionMode(enum.IntEnum):
@@ -78,8 +80,8 @@ class SessionManager:
         self.logging.debug(f"Writing Headers, set_auth: {set_auth}, referer: {referer}")
 
         if self.auth is None and not self.is_bearer:
-            raise NotImplementedError(
-                "Non-Bearer tokens are currently not working at the moment!"
+            raise RedGalaxyException(
+                "Non-Bearer tokens needs to be initalized seperately before calling any function."
             )
             # await self.get_access_token()
         self.headers = {
@@ -95,14 +97,16 @@ class SessionManager:
         if self._session:
             self._session.headers.clear()
             self._session.headers.update(self.headers)
-
-        # Ensure we have Guest Token
-        await self.ensure_token()
-        self.headers = {
-            **self.headers,
-            "x-guest-token": self.tokenManager.token,
-            # "x-twitter-active-user": "yes",
-        }
+        
+        # I'm personally not sure, 06/05/23 twitter seems to break if you try to get with bearer token?
+        if set_auth:
+            # Ensure we have Guest Token
+            await self.ensure_token()
+            self.headers = {
+                **self.headers,
+                "x-guest-token": self.tokenManager.token,
+                # "x-twitter-active-user": "yes",
+            }
         # self._session.cookies.clear()
         self._session.cookies.set("gt", self.tokenManager.token, domain=".twitter.com")
         self._session.headers.update(self.headers)
@@ -110,8 +114,11 @@ class SessionManager:
 
     async def ensure_token(self, retry=False):  # Taken from snscrape
         if not self.tokenManager.token or retry:
+            self.logging.debug("Requesting guest token")
+            uri = "https://api.twitter.com/1.1/guest/activate.json"
+            self.logging.debug(f"{self.headers}, {uri}")
             response = await self._session.post(
-                "https://api.twitter.com/1.1/guest/activate.json",
+                uri,
                 data=b"",
                 headers=self.headers,
             )
@@ -134,6 +141,7 @@ class SessionManager:
         set_auth=True,
         **kwargs,
     ):
+        
         await self.get_access_token()
         await self.do_headers(referer, set_auth)
         return await self.request("GET", url, **kwargs)
@@ -165,19 +173,26 @@ class SessionManager:
         if self.access_token:
             return self.access_token
         elif self.consumer[0] and self.consumer[1]:
-            await self.do_headers("https://twitter.com/")
+            #await self.do_headers("https://twitter.com/")
             encode = base64.standard_b64encode(
                 f"{self.consumer[0]}:{self.consumer[1]}".encode()
             )
             self.auth = f"Basic {encode.decode()}"
-            post_token = await self.post(
-                "https://api.twitter.com/oauth2/token?grant_type=client_credentials",
-                skip_access_check=True,
+            headers = {
+                "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                f"Chrome/109.0.0.0 Safari/537.{random.randint(0, 99)}",
+                "Authorization": self.auth,
+                "Referer": "https://twitter.com/",
+                "Accept-Language": "en-US,en;q=0.5",
+            }
+            post_token = await self.session.post(
+                "https://api.twitter.com/oauth2/token?grant_type=client_credentials", headers=headers
             )
             if post_token.status_code == 200:
-                code: dict = await post_token.json()
+                code: dict = post_token.json()
                 self.access_token = code["access_token"]
                 self.auth = f"Bearer {self.access_token}"
+                self.logging.info(f"Success. Set bearer to: {self.auth}")
             else:
                 print("Err:", post_token.text)
                 raise SessionManagerException(

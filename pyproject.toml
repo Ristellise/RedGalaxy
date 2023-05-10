@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "RedGalaxy"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
   { name="Ristellise", email="contact@shinon71.moe" },
 ]
